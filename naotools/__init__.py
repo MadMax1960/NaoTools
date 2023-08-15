@@ -1,5 +1,15 @@
 import bpy
 
+bl_info = {
+    "name": "NaoTools",
+    "author": "Mudkip",
+    "version": (2, 6),
+    "blender": (2, 80, 0),
+    "location": "View3D > N-panel",
+    "description": "Adds NaoTools for various operations",
+    "category": "Tool"
+}
+
 class NaoProperties(bpy.types.PropertyGroup):
     max_vertex_groups: bpy.props.IntProperty(
         name="Max Vertex Groups",
