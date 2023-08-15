@@ -27,7 +27,7 @@ NaoTools has 5 core features that just about anyone can make use of for any work
 Limit weights limits the amount of vertex groups a vertice can have for it's influence. Most games abide by 4, however there are some exceptions where less are allowed like in some switch games, or an infinite amount is allowed like P5R PS4. Generally, 4 is what you want, however you can customize the amount with a slider below the button, from 1-10. After you do this, it auto normalizes itself, however the Normalize button is there in case you make changes post weight limiting. 
 
 ### Normalize Weights
-This button is simply to make sure every vertice has a influence count adding up to 1. Blender doesn't auto normalize, and not everyone auto normalizes, so this button just does that but after basically. 
+This button is simply to make sure every vertice has a influence count adding up to 1. Blender doesn't auto normalize by default, and not everyone auto normalizes, so this button just does that but after basically. 
 
 ### Rename UV Maps 
 This button will rename the primary UV Map of every Mesh in the scene to whatever is entered in the box below it. The default is "UV0" which is what P5R uses, however the names of UVMaps that P4D, and Smash Ultimate are listed in the naming guide below it. If you use this tool for another game and want those uv names added, please make a github issue so I can append the list with more games.
