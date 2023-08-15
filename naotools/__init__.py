@@ -1,13 +1,3 @@
-bl_info = {
-    "name": "NaoTools",
-    "author": "Mudkip",
-    "version": (2, 6),
-    "blender": (2, 80, 0),
-    "location": "View3D > N-panel",
-    "description": "Adds NaoTools for various operations",
-    "category": "Tool"
-}
-
 import bpy
 
 class NaoProperties(bpy.types.PropertyGroup):
@@ -56,6 +46,36 @@ class NaoRenameUVOperator(bpy.types.Operator):
                     uv_map.name = context.scene.nao_custom_uv_name
         return {'FINISHED'}
 
+class NaoSplitByMaterialOperator(bpy.types.Operator):
+    bl_idname = "wm.nao_split_by_material_operator"
+    bl_label = "Split by Materials"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        for obj in bpy.context.selected_objects:
+            if obj.type == 'MESH' and obj.data.materials:
+                bpy.context.view_layer.objects.active = obj
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.separate(type='MATERIAL')
+                bpy.ops.object.mode_set(mode='OBJECT')
+        return {'FINISHED'}
+
+class NaoTriangulateOperator(bpy.types.Operator):
+    bl_idname = "wm.nao_triangulate_operator"
+    bl_label = "Triangulate Faces"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        for obj in bpy.context.selected_objects:
+            if obj.type == 'MESH':
+                bpy.context.view_layer.objects.active = obj
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.quads_convert_to_tris()
+                bpy.ops.object.mode_set(mode='OBJECT')
+        return {'FINISHED'}
+
 class NaoPanel(bpy.types.Panel):
     bl_idname = "PT_Nao_Panel"
     bl_label = "NaoTools"
@@ -68,17 +88,34 @@ class NaoPanel(bpy.types.Panel):
 
         # Display an image at the top
         layout.label(text="NaoTools", icon='PLUGIN')
-        
+
+        # All Meshes category
+        layout.label(text="All Meshes:")
         layout.operator("wm.nao_limit_weights_operator")
         layout.prop(context.scene.nao_props, "max_vertex_groups")
         layout.operator("wm.nao_normalize_operator")
         layout.operator("wm.nao_rename_uv_operator")
+        
         layout.prop(context.scene, "nao_custom_uv_name")
+        row = layout.row(align=True)
+        row.label(text="Custom UV Naming Guide:")
+        row.label(text="", icon="INFO")
+        layout.label(text="P5R: UV0")
+        layout.label(text="P4D: UV1")
+        layout.label(text="Smush: map1")
+        
+        # Selected Mesh category
+        layout.separator()
+        layout.label(text="Selected Mesh:")
+        layout.operator("wm.nao_split_by_material_operator")
+        layout.operator("wm.nao_triangulate_operator")
 
 classes = (
     NaoLimitWeightsOperator,
     NaoNormalizeOperator,
     NaoRenameUVOperator,
+    NaoSplitByMaterialOperator,
+    NaoTriangulateOperator,
     NaoPanel,
     NaoProperties
 )
