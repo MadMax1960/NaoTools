@@ -5,21 +5,20 @@ import bpy.utils.previews
 from .operators.limit_weights import NaoLimitWeightsOperator
 from .operators.ue_psk_fix import UEPskFixOperator
 from .operators.p3r_outline_mesh import P3ROutlineMeshOperator
-from .operators.p3r_outline_skin_mesh import P3ROutlineSkinMeshOperator
-from .operators.jjk_outline_mesh import JJKOutlineMeshOperator
 from .operators.normalize_weights import NaoNormalizeOperator
 from .operators.rename_uv import NaoRenameUVOperator
 from .operators.split_by_material import NaoSplitByMaterialOperator
 from .operators.triangulate_faces import NaoTriangulateOperator
 from .operators.clear_unused_weights import NaoClearUnusedWeightsOperator
-from .operators.copy_mirror_pose import NaoCopyMirrorPoseOperator
 from .operators.ue_material_duplicate import UEMaterialDuplicateOperator
 from .operators.skeleton_printer import SkeletonPrinterOperator
+from .operators.vertex_colors_to_normals import NaoVertexColorsToNormalsOperator
+from .operators.bake_normals_workflow import NaoBakeNormalsWorkflowOperator
 
 bl_info = {
     "name": "NaoTools",
     "author": "Mudkip",
-    "version": (2, 6),
+    "version": (3, 0),
     "blender": (2, 80, 0),
     "location": "View3D > N-panel",
     "description": "Adds NaoTools for various operations",
@@ -34,23 +33,6 @@ class NaoProperties(bpy.types.PropertyGroup):
         max=10
     )
 
-def register_suffixes():
-    bpy.types.Scene.nao_left_suffix = bpy.props.StringProperty(
-        name="Left Suffix",
-        description="Suffix for left-side bones (e.g., '_L', 'Left')",
-        default="L",
-    )
-    bpy.types.Scene.nao_right_suffix = bpy.props.StringProperty(
-        name="Right Suffix",
-        description="Suffix for right-side bones (e.g., '_R', 'Right')",
-        default="R",
-    )
-
-def unregister_suffixes():
-    del bpy.types.Scene.nao_left_suffix
-    del bpy.types.Scene.nao_right_suffix
-
-
 # A dictionary to hold the custom preview collection for images
 preview_collections = {}
 
@@ -64,7 +46,6 @@ class NaoToolsPanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-
         # Add description text
         layout.label(text="Tool to streamline various blender operations.")
 
@@ -107,31 +88,24 @@ class NaoSelectedMeshPanel(bpy.types.Panel):
         layout.operator("wm.nao_triangulate_operator")
         layout.operator("wm.nao_clear_unused_weights_operator") 
         layout.operator("wm.ue_material_duplicate_operator")
+        layout.operator("wm.p3r_outline_mesh_operator")
         
-class NaoMiscPanel(bpy.types.Panel):
+class NaoNormalBakingPanel(bpy.types.Panel):
     bl_parent_id = "PT_Nao_Tools_Main_Panel"
-    bl_label = "Misc"
-    bl_idname = "PT_Nao_Misc"
+    bl_label = "Normal Baking Workflow"
+    bl_idname = "PT_Nao_Normal_Baking_Panel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'NaoTools'
 
     def draw(self, context):
         layout = self.layout
-        scene = context.scene
+        # New Script Button (Automated Workflow)
+        layout.operator("wm.nao_bake_normals_workflow_operator")
+        # Removed separator to fix the gap
+        # Vertex Colors to Normals Button (Manual/Second step)
+        layout.operator("wm.nao_vertex_colors_to_normals_operator", text="Vertex Colors to Normals")
 
-        # Add Outline operators
-        layout.operator("wm.p3r_outline_mesh_operator")
-        layout.operator("wm.p3r_outline_skin_mesh_operator")
-        layout.operator("wm.jjk_outline_mesh_operator")
-
-        # Add bone suffix settings
-        layout.prop(scene, "nao_left_suffix")
-        layout.prop(scene, "nao_right_suffix")
-
-        # Add Copy & Mirror Pose button
-        layout.operator(NaoCopyMirrorPoseOperator.bl_idname)
-        
 class NaoSelectedArmaturePanel(bpy.types.Panel):
     bl_parent_id = "PT_Nao_Tools_Main_Panel"
     bl_label = "Selected Armature"
@@ -163,7 +137,6 @@ def unload_logo():
         bpy.utils.previews.remove(pcoll)
     preview_collections.clear()
 
-# Register and unregister all classes
 classes = (
     NaoProperties,
     NaoLimitWeightsOperator,
@@ -172,18 +145,17 @@ classes = (
     NaoSplitByMaterialOperator,
     NaoTriangulateOperator,
     P3ROutlineMeshOperator,
-    P3ROutlineSkinMeshOperator,
-    JJKOutlineMeshOperator,
     NaoClearUnusedWeightsOperator,
     NaoToolsPanel,
     NaoAllMeshesPanel,
     NaoSelectedMeshPanel,
-    NaoMiscPanel,
+    NaoNormalBakingPanel,
     NaoSelectedArmaturePanel,
     UEPskFixOperator,
-    NaoCopyMirrorPoseOperator,
     UEMaterialDuplicateOperator,
-    SkeletonPrinterOperator, 
+    SkeletonPrinterOperator,
+    NaoVertexColorsToNormalsOperator, 
+    NaoBakeNormalsWorkflowOperator,
 )
 
 def register():
@@ -191,7 +163,6 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.Scene.nao_custom_uv_name = bpy.props.StringProperty(name="UV Name", default="UV0")
     bpy.types.Scene.nao_props = bpy.props.PointerProperty(type=NaoProperties)
-    register_suffixes()
     load_logo()
 
 def unregister():
@@ -199,7 +170,6 @@ def unregister():
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.nao_custom_uv_name
     del bpy.types.Scene.nao_props
-    unregister_suffixes()
     unload_logo()
 
 if __name__ == "__main__":
