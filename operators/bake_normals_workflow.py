@@ -108,10 +108,28 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         if hasattr(context.view_layer, "depsgraph"):
              context.view_layer.depsgraph.update()
 
-        if not target_mesh.data.color_attributes:
-            target_mesh.data.color_attributes.new(name="Bake_Result_Col", type='BYTE_COLOR', domain='CORNER')
-        else:
-            target_mesh.data.color_attributes.active_color_index = 0
+        # --- MODIFICATION START: Temporary Layer Logic ---
+        # Remember original active layer index to restore later
+        original_active_index = 0
+        if target_mesh.data.color_attributes:
+            original_active_index = target_mesh.data.color_attributes.active_color_index
+
+        # Define temporary layer name
+        temp_layer_name = "Nao_Temp_Bake"
+
+        # Ensure we don't crash if it already exists from a previous failed run
+        if temp_layer_name in target_mesh.data.color_attributes:
+            target_mesh.data.color_attributes.remove(target_mesh.data.color_attributes[temp_layer_name])
+
+        # Create new temporary layer
+        target_mesh.data.color_attributes.new(name=temp_layer_name, type='BYTE_COLOR', domain='CORNER')
+
+        # Set the new temporary layer as active
+        for i, layer in enumerate(target_mesh.data.color_attributes):
+            if layer.name == temp_layer_name:
+                target_mesh.data.color_attributes.active_color_index = i
+                break
+        # --- MODIFICATION END ---
 
         mat_target = bpy.data.materials.new(name="TEMP_TARGET_MAT")
         mat_target.use_nodes = True
@@ -160,6 +178,16 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         # Ensure target is active
         context.view_layer.objects.active = target_mesh
         bpy.ops.wm.nao_vertex_colors_to_normals_operator()
+
+        # --- MODIFICATION START: Cleanup ---
+        # Remove the temporary layer
+        if temp_layer_name in target_mesh.data.color_attributes:
+            target_mesh.data.color_attributes.remove(target_mesh.data.color_attributes[temp_layer_name])
+
+        # Restore the original active layer if it is still valid
+        if target_mesh.data.color_attributes and original_active_index < len(target_mesh.data.color_attributes):
+            target_mesh.data.color_attributes.active_color_index = original_active_index
+        # --- MODIFICATION END ---
 
         self.report({'INFO'}, "Normal Transfer & Conversion Complete.")
         return {'FINISHED'}
