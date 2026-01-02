@@ -14,11 +14,12 @@ from .operators.ue_material_duplicate import UEMaterialDuplicateOperator
 from .operators.skeleton_printer import SkeletonPrinterOperator
 from .operators.vertex_colors_to_normals import NaoVertexColorsToNormalsOperator
 from .operators.bake_normals_workflow import NaoBakeNormalsWorkflowOperator
+from .operators.rename_materials_list import NaoRenameMaterialsListOperator
 
 bl_info = {
     "name": "NaoTools",
     "author": "Mudkip",
-    "version": (3, 0),
+    "version": (3, 1),
     "blender": (2, 80, 0),
     "location": "View3D > N-panel",
     "description": "Adds NaoTools for various operations",
@@ -88,7 +89,19 @@ class NaoSelectedMeshPanel(bpy.types.Panel):
         layout.operator("wm.nao_triangulate_operator")
         layout.operator("wm.nao_clear_unused_weights_operator") 
         layout.operator("wm.ue_material_duplicate_operator")
+
+class NaoMiscPanel(bpy.types.Panel):
+    bl_parent_id = "PT_Nao_Tools_Main_Panel"
+    bl_label = "Misc"
+    bl_idname = "PT_Nao_Misc_Panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'NaoTools'
+
+    def draw(self, context):
+        layout = self.layout
         layout.operator("wm.p3r_outline_mesh_operator")
+        layout.operator("wm.nao_rename_materials_list_operator")
         
 class NaoNormalBakingPanel(bpy.types.Panel):
     bl_parent_id = "PT_Nao_Tools_Main_Panel"
@@ -100,10 +113,7 @@ class NaoNormalBakingPanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        # New Script Button (Automated Workflow)
         layout.operator("wm.nao_bake_normals_workflow_operator")
-        # Removed separator to fix the gap
-        # Vertex Colors to Normals Button (Manual/Second step)
         layout.operator("wm.nao_vertex_colors_to_normals_operator", text="Vertex Colors to Normals")
 
 class NaoSelectedArmaturePanel(bpy.types.Panel):
@@ -149,6 +159,7 @@ classes = (
     NaoToolsPanel,
     NaoAllMeshesPanel,
     NaoSelectedMeshPanel,
+    NaoMiscPanel,
     NaoNormalBakingPanel,
     NaoSelectedArmaturePanel,
     UEPskFixOperator,
@@ -156,6 +167,7 @@ classes = (
     SkeletonPrinterOperator,
     NaoVertexColorsToNormalsOperator, 
     NaoBakeNormalsWorkflowOperator,
+    NaoRenameMaterialsListOperator,
 )
 
 def register():
