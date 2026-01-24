@@ -15,11 +15,12 @@ from .operators.skeleton_printer import SkeletonPrinterOperator
 from .operators.vertex_colors_to_normals import NaoVertexColorsToNormalsOperator
 from .operators.bake_normals_workflow import NaoBakeNormalsWorkflowOperator
 from .operators.rename_materials_list import NaoRenameMaterialsListOperator
+from .operators.delete_unused_bones import NaoDeleteUnusedBonesOperator
 
 bl_info = {
     "name": "NaoTools",
     "author": "Mudkip",
-    "version": (3, 1),
+    "version": (3, 2), # Bumped version slightly
     "blender": (2, 80, 0),
     "location": "View3D > N-panel",
     "description": "Adds NaoTools for various operations",
@@ -128,6 +129,8 @@ class NaoSelectedArmaturePanel(bpy.types.Panel):
         layout = self.layout
         layout.operator("wm.ue_psk_fix_operator")
         layout.operator("wm.skeleton_printer_operator")
+        # ADD NEW BUTTON HERE
+        layout.operator("wm.nao_delete_unused_bones_operator")
 
 # Function to load the logo image into preview collections
 def load_logo():
@@ -168,6 +171,7 @@ classes = (
     NaoVertexColorsToNormalsOperator, 
     NaoBakeNormalsWorkflowOperator,
     NaoRenameMaterialsListOperator,
+    NaoDeleteUnusedBonesOperator,
 )
 
 def register():

@@ -1,4 +1,5 @@
 import bpy
+import time
 
 class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
     bl_idname = "wm.nao_bake_normals_workflow_operator"
@@ -7,6 +8,8 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Starting NaoBakeNormalsWorkflowOperator")
+
         # 1. Validation
         selected = context.selected_objects
         active = context.active_object
@@ -26,7 +29,9 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
             self.report({'ERROR'}, "Both objects must be Meshes.")
             return {'CANCELLED'}
 
-        # 2. Stash Settings
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Source: {source_mesh.name}, Target: {target_mesh.name}")
+
+        # 2. Stash Settings & Materials
         scene = context.scene
         stashed_settings = {}
         stashed_materials = {}
@@ -42,9 +47,14 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
             stashed_settings['bake_target'] = scene.render.bake.target
             stashed_settings['bake_margin'] = scene.render.bake.margin
             
-            stashed_materials[source_mesh.name] = source_mesh.data.materials[0] if source_mesh.data.materials else None
-            stashed_materials[target_mesh.name] = target_mesh.data.materials[0] if target_mesh.data.materials else None
-        except Exception:
+            # FIXED: Stash from material_slots to preserve 'None' slots and exact order
+            stashed_materials[source_mesh.name] = [s.material for s in source_mesh.material_slots]
+            stashed_materials[target_mesh.name] = [s.material for s in target_mesh.material_slots]
+            
+            print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Stashed {len(stashed_materials[source_mesh.name])} slots for Source")
+            print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Stashed {len(stashed_materials[target_mesh.name])} slots for Target")
+        except Exception as e:
+            print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Error during stash: {e}")
             pass 
 
         # 3. Apply Low Specs
@@ -57,6 +67,7 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         scene.cycles.use_denoising = False
 
         # 4. Process Mesh 1 (Source) -> Bake Map Range
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Setting up Source Mesh...")
         bpy.ops.object.select_all(action='DESELECT')
         source_mesh.select_set(True)
         context.view_layer.objects.active = source_mesh
@@ -85,8 +96,12 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         links.new(geo_node.outputs['Normal'], map_node.inputs['Vector'])
         links.new(map_node.outputs['Vector'], out_node.inputs['Surface'])
         
-        source_mesh.data.materials.clear()
-        source_mesh.data.materials.append(mat)
+        # Apply temp mat to all slots
+        if not source_mesh.material_slots:
+            source_mesh.data.materials.append(mat)
+        else:
+            for i in range(len(source_mesh.material_slots)):
+                source_mesh.material_slots[i].material = mat
 
         scene.cycles.bake_type = 'COMBINED'
         scene.render.bake.target = 'IMAGE_TEXTURES'
@@ -95,41 +110,28 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         scene.render.bake.use_pass_indirect = False
         scene.render.bake.margin = 16
 
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Baking Map Range...")
         bpy.ops.object.bake(type='COMBINED')
         
         if len(bake_image.pixels) > 0:
             bake_image.pixels[0] = bake_image.pixels[0]
 
         # 5. Process Mesh 2 (Target) -> Bake to Vertex Colors
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Setting up Target Mesh...")
         bpy.ops.object.select_all(action='DESELECT')
         target_mesh.select_set(True)
         context.view_layer.objects.active = target_mesh
         
-        if hasattr(context.view_layer, "depsgraph"):
-             context.view_layer.depsgraph.update()
-
-        # --- MODIFICATION START: Temporary Layer Logic ---
-        # Remember original active layer index to restore later
-        original_active_index = 0
-        if target_mesh.data.color_attributes:
-            original_active_index = target_mesh.data.color_attributes.active_color_index
-
-        # Define temporary layer name
+        # Temporary Layer Logic
         temp_layer_name = "Nao_Temp_Bake"
-
-        # Ensure we don't crash if it already exists from a previous failed run
         if temp_layer_name in target_mesh.data.color_attributes:
             target_mesh.data.color_attributes.remove(target_mesh.data.color_attributes[temp_layer_name])
 
-        # Create new temporary layer
         target_mesh.data.color_attributes.new(name=temp_layer_name, type='BYTE_COLOR', domain='CORNER')
-
-        # Set the new temporary layer as active
         for i, layer in enumerate(target_mesh.data.color_attributes):
             if layer.name == temp_layer_name:
                 target_mesh.data.color_attributes.active_color_index = i
                 break
-        # --- MODIFICATION END ---
 
         mat_target = bpy.data.materials.new(name="TEMP_TARGET_MAT")
         mat_target.use_nodes = True
@@ -147,25 +149,61 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         links_t.new(tex_node_t.outputs['Color'], emit_node.inputs['Color'])
         links_t.new(emit_node.outputs['Emission'], out_node_t.inputs['Surface'])
         
-        target_mesh.data.materials.clear()
-        target_mesh.data.materials.append(mat_target)
+        # Apply temp mat to all slots
+        if not target_mesh.material_slots:
+            target_mesh.data.materials.append(mat_target)
+        else:
+            for i in range(len(target_mesh.material_slots)):
+                target_mesh.material_slots[i].material = mat_target
         
         scene.cycles.bake_type = 'EMIT' 
         scene.render.bake.target = 'VERTEX_COLORS'
         scene.render.bake.use_selected_to_active = False
 
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Baking Vertex Colors...")
         bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
         bpy.ops.object.bake(type='EMIT')
 
         # 6. Restoration
-        source_mesh.data.materials.clear()
-        if stashed_materials.get(source_mesh.name):
-            source_mesh.data.materials.append(stashed_materials[source_mesh.name])
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Restoring materials...")
+        
+        def restore_materials_safely(mesh, original_mats):
+            if not original_mats:
+                print(f"[{time.strftime('%H:%M:%S')}] DEBUG: No original materials to restore for {mesh.name}. Clearing.")
+                mesh.data.materials.clear()
+                return
 
-        target_mesh.data.materials.clear()
-        if stashed_materials.get(target_mesh.name):
-            target_mesh.data.materials.append(stashed_materials[target_mesh.name])
+            print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Restoring {len(original_mats)} slots for {mesh.name}")
+            
+            current_slots = len(mesh.material_slots)
+            
+            # If mismatch, fallback to clear + append (safe but loses faces)
+            if current_slots != len(original_mats):
+                 print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Slot count mismatch (Mesh: {current_slots}, Orig: {len(original_mats)}). Resetting.")
+                 mesh.data.materials.clear()
+                 for m in original_mats:
+                     if m:
+                         mesh.data.materials.append(m)
+                     else:
+                         # Append dummy to maintain slot count? Or just append None (not supported directly)?
+                         # We'll just add a new slot
+                         bpy.ops.object.material_slot_add()
+            else:
+                # Optimized path: Swap back safely
+                for i, m in enumerate(original_mats):
+                    print(f"[{time.strftime('%H:%M:%S')}] DEBUG:   -> Restoring Slot {i}...")
+                    try:
+                        mesh.material_slots[i].material = m
+                        print(f"[{time.strftime('%H:%M:%S')}] DEBUG:   -> Slot {i} Done.")
+                    except Exception as loop_e:
+                        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Error assigning slot {i}: {loop_e}")
 
+        # Restore
+        restore_materials_safely(source_mesh, stashed_materials.get(source_mesh.name, []))
+        restore_materials_safely(target_mesh, stashed_materials.get(target_mesh.name, []))
+
+        # Restore settings
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Restoring Render Settings...")
         try:
             scene.render.engine = stashed_settings.get('engine', 'CYCLES')
             scene.cycles.samples = stashed_settings.get('samples', 128)
@@ -174,20 +212,16 @@ class NaoBakeNormalsWorkflowOperator(bpy.types.Operator):
         except Exception:
             pass
 
-        # 7. Final Step: Convert Vertex Colors to Normals (Logic Chain)
-        # Ensure target is active
+        # 7. Final Step: Convert Vertex Colors to Normals
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Converting VColors to Normals...")
         context.view_layer.objects.active = target_mesh
         bpy.ops.wm.nao_vertex_colors_to_normals_operator()
 
-        # --- MODIFICATION START: Cleanup ---
-        # Remove the temporary layer
+        # Cleanup
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Cleanup...")
         if temp_layer_name in target_mesh.data.color_attributes:
             target_mesh.data.color_attributes.remove(target_mesh.data.color_attributes[temp_layer_name])
 
-        # Restore the original active layer if it is still valid
-        if target_mesh.data.color_attributes and original_active_index < len(target_mesh.data.color_attributes):
-            target_mesh.data.color_attributes.active_color_index = original_active_index
-        # --- MODIFICATION END ---
-
         self.report({'INFO'}, "Normal Transfer & Conversion Complete.")
+        print(f"[{time.strftime('%H:%M:%S')}] DEBUG: Process Complete.")
         return {'FINISHED'}
